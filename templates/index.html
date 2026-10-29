@@ -21,7 +21,7 @@
       <section class="hero">
         <p class="eyebrow">PENJERNIH FOTO + VIDEO</p>
         <h1>Lebih jernih.<br><span>Tetap terlihat natural.</span></h1>
-        <p class="hero-copy">Tingkatkan detail foto dan video sehari-hari dengan sentuhan yang lebih lembut. Tanpa filter pembentuk wajah, mode anime, atau tampilan AI yang berlebihan.</p>
+        <p class="hero-copy">Perbesar foto dan video 2× atau 4×, lalu atur tingkat detail sesuai kebutuhan.</p>
       </section>
 
       {% if not backend_ready %}
@@ -62,7 +62,7 @@
           <fieldset class="setting-group strength-group">
             <legend><label for="strength">Campuran detail AI <output id="strength-value">{{ default_strength }}%</output></label></legend>
             <input id="strength" type="range" min="0" max="100" step="5" value="{{ default_strength }}">
-            <div class="range-labels"><span>0% · Lanczos saja</span><span>Di atas 50% lebih berisiko tampak AI</span></div>
+            <div class="range-labels"><span>0% · LANCZOS saja</span><span>100% · detail AI penuh</span></div>
           </fieldset>
         </div>
 
@@ -74,7 +74,7 @@
         <button id="start-button" class="primary-button" type="button" {% if not backend_ready %}disabled{% endif %}>
           <span>Tingkatkan file</span><span class="button-arrow" aria-hidden="true">↗</span>
         </button>
-        <p class="privacy-note"><span aria-hidden="true">◈</span> File diproses oleh mesin yang menjalankan ClearFrame, tidak dimasukkan ke repositori, dan hasil sementara kedaluwarsa dalam satu jam.</p>
+        <p class="privacy-note"><span aria-hidden="true">◈</span> Berkas diproses di mesin yang menjalankan aplikasi. Tautan hasil berlaku selama satu jam.</p>
       </section>
 
       <section class="job-card" id="job-card" hidden aria-live="polite">
@@ -87,9 +87,9 @@
       </section>
 
       <section class="notes-row">
-        <div class="note-item"><span class="note-number">01</span><div><strong>Model untuk foto umum</strong><p>Memakai model foto Real-ESRGAN umum, bukan model khusus anime.</p></div></div>
-        <div class="note-item"><span class="note-number">02</span><div><strong>Tanpa sintesis wajah</strong><p>Jika detail terasa terlalu tajam, turunkan pengaturan kekuatannya.</p></div></div>
-        <div class="note-item"><span class="note-number">03</span><div><strong>Belum dibandingkan dengan Wink</strong><p>Prototipe ini belum membuktikan klaim “2× lebih bagus”; hasil bergantung pada sumber, jadi bandingkan berdampingan.</p></div></div>
+        <div class="note-item"><span class="note-number">01</span><div><strong>Pilih skala</strong><p>Gunakan pembesaran 2× atau 4× sesuai kebutuhan.</p></div></div>
+        <div class="note-item"><span class="note-number">02</span><div><strong>Atur tingkat detail</strong><p>Mulai dari nilai rendah untuk hasil yang lebih natural.</p></div></div>
+        <div class="note-item"><span class="note-number">03</span><div><strong>Periksa hasil video</strong><p>Detail dapat berubah pada gerakan yang cepat.</p></div></div>
       </section>
     </main>
     <footer><span>Prototipe ClearFrame</span><span>Media disimpan sementara di mesin aplikasi.</span></footer>
