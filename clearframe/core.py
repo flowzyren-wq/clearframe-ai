@@ -17,6 +17,7 @@ SUPPORTED_VIDEOS = {".mp4", ".mov", ".m4v", ".mkv", ".webm"}
 Progress = Callable[[str, int | None], None]
 VIDEO_BATCH_SIZE = 32
 VIDEO_FRAME_JPEG_QUALITY = 98
+DEFAULT_TILE_SIZE = 512
 
 
 class EnhancementError(RuntimeError):
@@ -54,7 +55,14 @@ def _ffprobe(path: Path) -> dict:
 
 
 def _engine_command(engine: Path, model_dir: Path, input_path: Path, output_path: Path,
-                    scale: int, *, tile: int = 256) -> list[str]:
+                    scale: int, *, tile: int | None = None) -> list[str]:
+    if tile is None:
+        try:
+            tile = int(os.environ.get("CLEARFRAME_TILE_SIZE", str(DEFAULT_TILE_SIZE)))
+        except ValueError as exc:
+            raise EnhancementError("CLEARFRAME_TILE_SIZE harus 0 atau angka minimal 32.") from exc
+    if tile < 0 or 0 < tile < 32:
+        raise EnhancementError("CLEARFRAME_TILE_SIZE harus 0 atau angka minimal 32.")
     return [
         str(engine), "-i", str(input_path), "-o", str(output_path),
         "-n", GENERAL_MODEL, "-s", str(scale), "-t", str(tile),
@@ -91,7 +99,7 @@ def _blend_and_save(source: Image.Image, ai_result: Image.Image, output: Path,
 
 def enhance_image(source_path: Path, output_path: Path, work_dir: Path,
                   engine: Path, model_dir: Path, scale: int = 2,
-                  strength: int = 35, progress: Progress | None = None) -> None:
+                  strength: int = 20, progress: Progress | None = None) -> None:
     if progress:
         progress("Menyiapkan foto", 5)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -210,7 +218,7 @@ def _encode_video(concat_list: Path, source_path: Path, output_path: Path,
 
 def enhance_video(source_path: Path, output_path: Path, work_dir: Path,
                   engine: Path, model_dir: Path, scale: int = 2,
-                  strength: int = 35, keep_audio: bool = True,
+                  strength: int = 20, keep_audio: bool = True,
                   progress: Progress | None = None,
                   max_seconds: int = 180,
                   batch_size: int = VIDEO_BATCH_SIZE) -> None:

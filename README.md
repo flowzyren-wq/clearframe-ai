@@ -4,7 +4,7 @@
 
 ## Jalankan lokal
 
-Persyaratan: Python 3.10+, FFmpeg (`ffmpeg` dan `ffprobe` di `PATH`), dan dukungan Vulkan pada sistem. Pada GPU yang kompatibel, Real-ESRGAN NCNN Vulkan memakai akselerasi yang tersedia; untuk tes di mesin tanpa GPU, backend Vulkan perangkat lunak mungkin berjalan jauh lebih lambat.
+Persyaratan: Python 3.10+, FFmpeg (`ffmpeg` dan `ffprobe` di `PATH`), dan dukungan Vulkan pada sistem. Pada GPU yang kompatibel, Real-ESRGAN NCNN Vulkan memakai akselerasi yang tersedia; tanpa GPU, backend Vulkan perangkat lunak tetap bisa berjalan tetapi dapat jauh lebih lambat. Tile default 512 dituning untuk overhead lebih rendah; set `CLEARFRAME_TILE_SIZE=256` atau lebih kecil (minimal 32) jika GPU memiliki VRAM terbatas, atau 0 untuk mode otomatis.
 
 ```bash
 python -m venv .venv
@@ -21,19 +21,19 @@ Buka `http://127.0.0.1:7860`. Server hanya bind ke localhost secara default. Unt
 ## Cara kerja
 
 - Backend memakai model general-purpose `realesrgan-x4plus` dari Real-ESRGAN. Installer mengunduh rilis portabel resmi tetapi **hanya mengekstrak model umum**; model anime tidak disimpan di proyek atau dipasang.
-- Neural output dicampur dengan versi LANCZOS dari sumber. Slider “Enhancement strength” mengontrol pencampuran ini; default 35% dipilih sebagai titik awal konservatif untuk menahan detail sintetis, bukan jaminan paling baik untuk semua file.
+- Neural output dicampur dengan versi LANCZOS dari sumber. Slider “Enhancement strength” mengontrol pencampuran ini; default 20% dipilih sebagai titik awal konservatif setelah inspeksi frame HD menunjukkan kontur AI bergeser pada 35%, bukan jaminan paling baik untuk semua file.
 - Foto diekspor sebagai PNG. Video diproses per batch 32 frame untuk membatasi penyimpanan sementara; frame hasil antara memakai JPEG kualitas 98 sebelum encoding video. Urutan, timestamp, resolusi sesuai skala, dan audio asli dipertahankan jika diminta. Jika audio tidak dapat disalin ke MP4, backend mencoba encode AAC. Durasi prototipe default maksimum 180 detik.
 - Frame-by-frame super-resolution masih dapat menimbulkan perubahan detail antar-frame pada gerakan cepat. Tidak ada face synthesis; namun model AI tetap bisa mengarang tekstur, jadi periksa hasil dan turunkan strength bila perlu.
 
 ## Uji lokal
 
-Jalankan `python -m unittest discover -s tests -v` untuk memeriksa rendering aplikasi, retensi transparansi, ukuran hasil 2×, pemrosesan video lintas batch, durasi, dan audio. Tes kualitas visual tetap perlu dilihat pada beberapa foto dan video nyata; angka resolusi atau ketajaman saja tidak membuktikan detail lebih akurat.
+Jalankan `python -m unittest discover -s tests -v` untuk memeriksa rendering aplikasi, retensi transparansi, ukuran hasil 2×, pemrosesan video lintas batch, durasi, dan audio. Di sandbox CPU-only (8 thread, RAM 23 GiB, Vulkan llvmpipe), satu frame 720×1280 memerlukan 620 detik untuk keluaran 1440×2560 dengan tile 512; ini mengonfirmasi satu frame skala penuh, bukan keseluruhan video. Klip uji berisi animasi dan overlay teks, jadi tidak membuktikan kualitas pada foto wajah atau video nyata lain. Angka resolusi atau ketajaman saja tidak membuktikan detail lebih akurat.
 
 ## Privasi dan masa simpan
 
 Pemrosesan berlangsung pada mesin yang menjalankan aplikasi. Unggahan dan hasil berada di direktori sementara lokal (`/tmp/clearframe-local` secara default) dan tautan hasil kedaluwarsa setelah satu jam. Tidak ada media yang dimasukkan ke repository. Jika aplikasi dijalankan di komputer cloud, file diproses di komputer cloud tersebut—gunakan file yang memang ingin Anda unggah ke sana.
 
-Atur lokasi dengan `CLEARFRAME_DATA_DIR`, batas unggahan dengan `CLEARFRAME_MAX_UPLOAD_BYTES`, batas durasi dengan `CLEARFRAME_MAX_VIDEO_SECONDS`, atau cache model dengan `CLEARFRAME_RUNTIME`.
+Atur lokasi dengan `CLEARFRAME_DATA_DIR`, batas unggahan dengan `CLEARFRAME_MAX_UPLOAD_BYTES`, batas durasi dengan `CLEARFRAME_MAX_VIDEO_SECONDS`, ukuran tile dengan `CLEARFRAME_TILE_SIZE`, atau cache model dengan `CLEARFRAME_RUNTIME`.
 
 ## Tentang klaim kualitas
 

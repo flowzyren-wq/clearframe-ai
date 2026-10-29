@@ -7,11 +7,12 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from PIL import Image, ImageDraw
 
 from app import RUNTIME_DIR, create_app
-from clearframe.core import _blend_and_save, enhance_image, enhance_video
+from clearframe.core import _blend_and_save, _engine_command, enhance_image, enhance_video
 
 
 ENGINE = RUNTIME_DIR / ("realesrgan-ncnn-vulkan.exe" if os.name == "nt" else "realesrgan-ncnn-vulkan")
@@ -84,13 +85,21 @@ class EnhancementSmokeTests(unittest.TestCase):
 
 
 class AppSmokeTests(unittest.TestCase):
+    def test_engine_tile_default_and_override(self):
+        args = (Path("engine"), Path("models"), Path("input"), Path("output"), 2)
+        command = _engine_command(*args)
+        self.assertEqual(command[command.index("-t") + 1], "512")
+        with patch.dict(os.environ, {"CLEARFRAME_TILE_SIZE": "256"}):
+            command = _engine_command(*args)
+        self.assertEqual(command[command.index("-t") + 1], "256")
+
     def test_home_renders_in_indonesian(self):
         client = create_app().test_client()
         response = client.get("/")
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Tingkatkan file", response.data)
         self.assertIn(b"foto dan video", response.data.lower())
-        self.assertIn(b'value="35"', response.data)
+        self.assertIn(b'value="20"', response.data)
 
     def test_invalid_upload_is_rejected(self):
         client = create_app().test_client()
