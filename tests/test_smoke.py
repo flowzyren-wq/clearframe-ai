@@ -1,0 +1,102 @@
+from __future__ import annotations
+
+import json
+import io
+import os
+import subprocess
+import tempfile
+import unittest
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+from app import RUNTIME_DIR, create_app
+from clearframe.core import _blend_and_save, enhance_image, enhance_video
+
+
+ENGINE = RUNTIME_DIR / ("realesrgan-ncnn-vulkan.exe" if os.name == "nt" else "realesrgan-ncnn-vulkan")
+MODEL_DIR = RUNTIME_DIR / "models"
+BACKEND_READY = ENGINE.is_file() and all(
+    (MODEL_DIR / f"realesrgan-x4plus{suffix}").is_file() for suffix in (".bin", ".param")
+)
+
+
+@unittest.skipUnless(BACKEND_READY, "Install backend first: python scripts/install_backend.py")
+class EnhancementSmokeTests(unittest.TestCase):
+    def test_intermediate_video_frame_is_full_size_high_quality_jpeg(self):
+        with tempfile.TemporaryDirectory(prefix="clearframe-test-") as temp:
+            root = Path(temp)
+            source = Image.new("RGB", (16, 12), (105, 125, 145))
+            ai = Image.new("RGB", (32, 24), (115, 135, 155))
+            output = root / "frame.jpg"
+            _blend_and_save(source, ai, output, scale=2, strength=35, output_format="JPEG")
+            with Image.open(output) as result:
+                self.assertEqual(result.size, (32, 24))
+                self.assertEqual(result.format, "JPEG")
+
+    def test_photo_is_2x_and_alpha_is_retained(self):
+        with tempfile.TemporaryDirectory(prefix="clearframe-test-") as temp:
+            root = Path(temp)
+            photo = Image.new("RGBA", (64, 48), (150, 115, 90, 255))
+            draw = ImageDraw.Draw(photo)
+            draw.rectangle((8, 7, 53, 40), outline=(20, 42, 55, 220), width=2)
+            draw.line((0, 47, 63, 0), fill=(25, 118, 130, 180), width=3)
+            source, output = root / "source.png", root / "result.png"
+            photo.save(source)
+            enhance_image(source, output, root / "work", ENGINE, MODEL_DIR, scale=2, strength=55)
+            with Image.open(output) as result:
+                self.assertEqual(result.size, (128, 96))
+                self.assertEqual(result.mode, "RGBA")
+                self.assertLess(result.getchannel("A").getextrema()[0], 255)
+
+    def test_video_keeps_frames_audio_and_2x_size(self):
+        with tempfile.TemporaryDirectory(prefix="clearframe-test-") as temp:
+            root = Path(temp)
+            frames = root / "frames"
+            frames.mkdir()
+            for index, color in enumerate(((45, 95, 125), (70, 115, 135))):
+                image = Image.new("RGB", (64, 48), color)
+                draw = ImageDraw.Draw(image)
+                draw.ellipse((12 + index, 8, 42 + index, 38), outline=(240, 225, 180), width=2)
+                image.save(frames / f"frame_{index:02d}.png")
+            source = root / "source.mp4"
+            subprocess.run([
+                "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
+                "-framerate", "2", "-i", str(frames / "frame_%02d.png"),
+                "-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=1",
+                "-t", "1", "-c:v", "libx264", "-pix_fmt", "yuv420p",
+                "-c:a", "aac", str(source),
+            ], check=True)
+            output = root / "result.mp4"
+            enhance_video(source, output, root / "work", ENGINE, MODEL_DIR,
+                          scale=2, strength=45, keep_audio=True, max_seconds=10,
+                          batch_size=1)
+            probe = subprocess.run([
+                "ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", str(output)
+            ], check=True, capture_output=True, text=True)
+            info = json.loads(probe.stdout)
+            video_stream = next(stream for stream in info["streams"] if stream["codec_type"] == "video")
+            audio_streams = [stream for stream in info["streams"] if stream["codec_type"] == "audio"]
+            self.assertEqual((video_stream["width"], video_stream["height"]), (128, 96))
+            self.assertEqual(video_stream.get("nb_frames"), "2")
+            self.assertTrue(audio_streams, "source audio should remain in the output")
+            self.assertAlmostEqual(float(info["format"]["duration"]), 1.0, delta=0.2)
+
+
+class AppSmokeTests(unittest.TestCase):
+    def test_home_renders_in_indonesian(self):
+        client = create_app().test_client()
+        response = client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"Tingkatkan file", response.data)
+        self.assertIn(b"foto dan video", response.data.lower())
+        self.assertIn(b'value="35"', response.data)
+
+    def test_invalid_upload_is_rejected(self):
+        client = create_app().test_client()
+        response = client.post("/api/jobs", data={"file": (io.BytesIO(b"GIF89a"), "test.gif", "image/gif")})
+        self.assertIn(response.status_code, (415, 503))
+
+
+if __name__ == "__main__":
+    unittest.main(verbosity=2)

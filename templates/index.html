@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a1018">
+  <title>ClearFrame — Peningkat Foto & Video</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-max-upload-mb="{{ max_upload_mb }}">
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="Beranda ClearFrame">
+        <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+        <span>clearframe</span>
+      </a>
+      <div class="local-badge"><span class="pulse-dot"></span> diproses di mesin ini</div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <p class="eyebrow">PENJERNIH FOTO + VIDEO</p>
+        <h1>Lebih jernih.<br><span>Tetap terlihat natural.</span></h1>
+        <p class="hero-copy">Tingkatkan detail foto dan video sehari-hari dengan sentuhan yang lebih lembut. Tanpa filter pembentuk wajah, mode anime, atau tampilan AI yang berlebihan.</p>
+      </section>
+
+      {% if not backend_ready %}
+      <section class="notice setup-notice" role="status">
+        <strong>Perlu satu kali setup</strong>
+        <span>Pasang engine peningkatan umum dengan <code>python scripts/install_backend.py</code>.</span>
+      </section>
+      {% endif %}
+
+      <section class="workspace-card" aria-labelledby="upload-heading">
+        <div class="card-heading">
+          <div>
+            <p class="eyebrow">MULAI DARI FILE</p>
+            <h2 id="upload-heading">Buat salinan yang lebih jernih</h2>
+          </div>
+          <span class="format-pill">JPG · PNG · WEBP · MP4 · MOV</span>
+        </div>
+
+        <label class="dropzone" id="dropzone" for="file-input">
+          <input id="file-input" type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime,video/x-m4v,video/x-matroska,video/webm,.m4v,.mkv">
+          <span class="upload-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 15v4a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="drop-title">Taruh foto atau video di sini</span>
+          <span class="drop-subtitle">atau <span class="choose-link">pilih file</span></span>
+          <span class="drop-limit">Maks. {{ max_upload_mb }} MB · video maks. {{ max_video_seconds }} detik</span>
+          <span class="selected-file" id="selected-file" hidden></span>
+        </label>
+
+        <div class="settings-grid">
+          <fieldset class="setting-group">
+            <legend>Ukuran hasil</legend>
+            <div class="segmented-control" role="radiogroup" aria-label="Ukuran hasil">
+              <label class="segment"><input type="radio" name="scale" value="2" checked><span>2× <small>disarankan</small></span></label>
+              <label class="segment"><input type="radio" name="scale" value="4"><span>4× <small>file lebih besar</small></span></label>
+            </div>
+          </fieldset>
+          <fieldset class="setting-group strength-group">
+            <legend><label for="strength">Kekuatan peningkatan <output id="strength-value">35%</output></label></legend>
+            <input id="strength" type="range" min="10" max="100" value="35">
+            <div class="range-labels"><span>Lebih natural</span><span>Lebih detail</span></div>
+          </fieldset>
+        </div>
+
+        <label class="audio-option" id="audio-option" hidden>
+          <span class="check-wrap"><input id="keep-audio" type="checkbox" checked><span class="custom-check"></span></span>
+          <span><strong>Pertahankan audio asli</strong><small>Disalin apa adanya jika format hasil mendukung.</small></span>
+        </label>
+
+        <button id="start-button" class="primary-button" type="button" {% if not backend_ready %}disabled{% endif %}>
+          <span>Tingkatkan file</span><span class="button-arrow" aria-hidden="true">↗</span>
+        </button>
+        <p class="privacy-note"><span aria-hidden="true">◈</span> File diproses oleh mesin yang menjalankan ClearFrame, tidak dimasukkan ke repositori, dan hasil sementara kedaluwarsa dalam satu jam.</p>
+      </section>
+
+      <section class="job-card" id="job-card" hidden aria-live="polite">
+        <div class="job-topline"><span class="job-state" id="job-state">MENGANTRE</span><span class="job-percent" id="job-percent">0%</span></div>
+        <h2 id="job-message">Menunggu giliran…</h2>
+        <div class="progress-track"><div id="progress-bar" class="progress-bar"></div></div>
+        <p class="job-error" id="job-error" hidden></p>
+        <a id="download-link" class="download-button" href="#" hidden>Unduh hasil <span>↓</span></a>
+        <button id="reset-button" class="text-button" type="button" hidden>Tingkatkan file lain</button>
+      </section>
+
+      <section class="notes-row">
+        <div class="note-item"><span class="note-number">01</span><div><strong>Model untuk foto umum</strong><p>Memakai model foto Real-ESRGAN umum, bukan model khusus anime.</p></div></div>
+        <div class="note-item"><span class="note-number">02</span><div><strong>Tanpa sintesis wajah</strong><p>Jika detail terasa terlalu tajam, turunkan pengaturan kekuatannya.</p></div></div>
+        <div class="note-item"><span class="note-number">03</span><div><strong>Belum dibandingkan dengan Wink</strong><p>Prototipe ini belum membuktikan klaim “2× lebih bagus”; hasil bergantung pada sumber, jadi bandingkan berdampingan.</p></div></div>
+      </section>
+    </main>
+    <footer><span>Prototipe ClearFrame</span><span>Media disimpan sementara di mesin aplikasi.</span></footer>
+  </div>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
