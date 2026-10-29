@@ -1,0 +1,164 @@
+[
+  {
+    "image": "portrait",
+    "seconds": 178.8,
+    "variants": [
+      {
+        "variant": "lanczos",
+        "psnr_db": 34.28,
+        "ssim": 0.93701,
+        "detail": 6.194
+      },
+      {
+        "variant": "lanczos_sharp_0.4",
+        "psnr_db": 34.32,
+        "ssim": 0.94068,
+        "detail": 7.058
+      },
+      {
+        "variant": "ai_15",
+        "psnr_db": 34.3,
+        "ssim": 0.94014,
+        "detail": 7.57
+      },
+      {
+        "variant": "ai_30",
+        "psnr_db": 33.19,
+        "ssim": 0.93191,
+        "detail": 9.811
+      },
+      {
+        "variant": "ai_50",
+        "psnr_db": 31.01,
+        "ssim": 0.90723,
+        "detail": 13.414
+      },
+      {
+        "variant": "ai_70",
+        "psnr_db": 28.75,
+        "ssim": 0.87122,
+        "detail": 17.349
+      },
+      {
+        "variant": "ai_100",
+        "psnr_db": 26.09,
+        "ssim": 0.80962,
+        "detail": 23.498
+      },
+      {
+        "variant": "ai_30_sharp_0.3",
+        "psnr_db": 32.48,
+        "ssim": 0.92648,
+        "detail": 11.573
+      }
+    ]
+  },
+  {
+    "image": "product",
+    "seconds": 179.9,
+    "variants": [
+      {
+        "variant": "lanczos",
+        "psnr_db": 31.12,
+        "ssim": 0.93666,
+        "detail": 6.542
+      },
+      {
+        "variant": "lanczos_sharp_0.4",
+        "psnr_db": 31.35,
+        "ssim": 0.94222,
+        "detail": 7.608
+      },
+      {
+        "variant": "ai_15",
+        "psnr_db": 31.17,
+        "ssim": 0.93854,
+        "detail": 7.512
+      },
+      {
+        "variant": "ai_30",
+        "psnr_db": 30.51,
+        "ssim": 0.93314,
+        "detail": 9.101
+      },
+      {
+        "variant": "ai_50",
+        "psnr_db": 28.94,
+        "ssim": 0.91724,
+        "detail": 11.714
+      },
+      {
+        "variant": "ai_70",
+        "psnr_db": 27.17,
+        "ssim": 0.89425,
+        "detail": 14.667
+      },
+      {
+        "variant": "ai_100",
+        "psnr_db": 24.77,
+        "ssim": 0.85298,
+        "detail": 19.387
+      },
+      {
+        "variant": "ai_30_sharp_0.3",
+        "psnr_db": 30.1,
+        "ssim": 0.93311,
+        "detail": 10.616
+      }
+    ]
+  },
+  {
+    "image": "street",
+    "seconds": 182.8,
+    "variants": [
+      {
+        "variant": "lanczos",
+        "psnr_db": 24.69,
+        "ssim": 0.81634,
+        "detail": 14.04
+      },
+      {
+        "variant": "lanczos_sharp_0.4",
+        "psnr_db": 24.83,
+        "ssim": 0.83171,
+        "detail": 16.833
+      },
+      {
+        "variant": "ai_15",
+        "psnr_db": 24.92,
+        "ssim": 0.82344,
+        "detail": 15.099
+      },
+      {
+        "variant": "ai_30",
+        "psnr_db": 24.93,
+        "ssim": 0.82464,
+        "detail": 17.125
+      },
+      {
+        "variant": "ai_50",
+        "psnr_db": 24.6,
+        "ssim": 0.81699,
+        "detail": 20.777
+      },
+      {
+        "variant": "ai_70",
+        "psnr_db": 23.91,
+        "ssim": 0.79847,
+        "detail": 25.154
+      },
+      {
+        "variant": "ai_100",
+        "psnr_db": 22.64,
+        "ssim": 0.75561,
+        "detail": 32.576
+      },
+      {
+        "variant": "ai_30_sharp_0.3",
+        "psnr_db": 25.01,
+        "ssim": 0.83637,
+        "detail": 20.261
+      }
+    ]
+  }
+]

@@ -2,6 +2,8 @@
 
 **Prototipe enhancement foto dan video umum** dengan output 2×/4× dan slider untuk menahan detail AI agar hasilnya tetap terlihat natural. Tidak ada mode anime, model anime, atau filter restorasi wajah khusus.
 
+Metode uji dan angkanya ada di [docs/quality-report.md](docs/quality-report.md); skripnya bisa dijalankan ulang dengan `python docs/benchmark.py`.
+
 ## Jalankan lokal
 
 Persyaratan: Python 3.10+, FFmpeg (`ffmpeg` dan `ffprobe` di `PATH`), dan dukungan Vulkan pada sistem. Pada GPU yang kompatibel, Real-ESRGAN NCNN Vulkan memakai akselerasi yang tersedia; tanpa GPU, backend Vulkan perangkat lunak tetap bisa berjalan tetapi dapat jauh lebih lambat. Tile default 512 dituning untuk overhead lebih rendah; set `CLEARFRAME_TILE_SIZE=256` atau lebih kecil (minimal 32) jika GPU memiliki VRAM terbatas, atau 0 untuk mode otomatis.
@@ -21,13 +23,16 @@ Buka `http://127.0.0.1:7860`. Server hanya bind ke localhost secara default. Unt
 ## Cara kerja
 
 - Backend memakai model general-purpose `realesrgan-x4plus` dari Real-ESRGAN. Installer mengunduh rilis portabel resmi tetapi **hanya mengekstrak model umum**; model anime tidak disimpan di proyek atau dipasang.
-- Neural output dicampur dengan versi LANCZOS dari sumber. Slider “Enhancement strength” mengontrol pencampuran ini; default 20% dipilih sebagai titik awal konservatif setelah inspeksi frame HD menunjukkan kontur AI bergeser pada 35%, bukan jaminan paling baik untuk semua file.
+- Model selalu dijalankan pada skala aslinya 4×, lalu hasilnya diperkecil ke 2× bila perlu. Jalur 2× bawaan engine ternyata menyusun kuadran gambar di posisi salah pada pengujian lokal, sehingga tidak dipakai lagi. Tile internal engine juga dimatikan karena meninggalkan sambungan konten bergeser; gambar besar dipotong menjadi strip mendatar yang tumpang tindih lalu dilebur.
+- Neural output dicampur dengan versi LANCZOS dari sumber. Default 30% dipilih dari pengujian tiga foto sintetis: pada titik ini detail mikro naik sekitar 34% dibanding pembesaran biasa sementara rata-rata kemiripan struktur setara (SSIM 0,8966 vs 0,8967). 15% cocok bila ingin perubahan paling halus (SSIM justru sedikit lebih tinggi dari pembesaran biasa). Pilihan 0% mematikan kontribusi AI. Di atas 50% tekstur mulai terasa over-processed, terutama pada kulit.
 - Foto diekspor sebagai PNG. Video diproses per batch 32 frame untuk membatasi penyimpanan sementara; frame hasil antara memakai JPEG kualitas 98 sebelum encoding video. Urutan, timestamp, resolusi sesuai skala, dan audio asli dipertahankan jika diminta. Jika audio tidak dapat disalin ke MP4, backend mencoba encode AAC. Durasi prototipe default maksimum 180 detik.
 - Frame-by-frame super-resolution masih dapat menimbulkan perubahan detail antar-frame pada gerakan cepat. Tidak ada face synthesis; namun model AI tetap bisa mengarang tekstur, jadi periksa hasil dan turunkan strength bila perlu.
 
 ## Uji lokal
 
-Jalankan `python -m unittest discover -s tests -v` untuk memeriksa rendering aplikasi, retensi transparansi, ukuran hasil 2×, pemrosesan video lintas batch, durasi, dan audio. Di sandbox CPU-only (8 thread, RAM 23 GiB, Vulkan llvmpipe), satu frame 720×1280 memerlukan 620 detik untuk keluaran 1440×2560 dengan tile 512; ini mengonfirmasi satu frame skala penuh, bukan keseluruhan video. Klip uji berisi animasi dan overlay teks, jadi tidak membuktikan kualitas pada foto wajah atau video nyata lain. Angka resolusi atau ketajaman saja tidak membuktikan detail lebih akurat.
+Jalankan `python -m unittest discover -s tests -v` untuk memeriksa rendering aplikasi, retensi transparansi, mode 0% yang sama persis dengan pembesaran LANCZOS, ukuran hasil 2×, pemrosesan video lintas batch, durasi, dan audio.
+
+Benchmark lokal memakai tiga foto sintetis (potret, jalan kota, still life produk) sebagai ground truth 720×1080, diperkecil ke 360×540, lalu dinaikkan kembali. Di sandbox CPU-only (8 thread, RAM 23 GiB, Vulkan llvmpipe) satu foto 360×540 memerlukan sekitar 3 menit untuk hasil 720×1080. Skor kemiripan struktur (SSIM) pada potret: LANCZOS 0,937; campuran AI 15% 0,940; 30% 0,932; 50% 0,907. Detail mikro (rata-rata Laplacian) naik dari 6,19 pada LANCZOS menjadi 9,81 pada 30%. Angka ini mengukur kedekatan dengan gambar asli dan jumlah detail, bukan selera visual atau perbandingan dengan aplikasi lain.
 
 ## Privasi dan masa simpan
 
@@ -37,7 +42,7 @@ Atur lokasi dengan `CLEARFRAME_DATA_DIR`, batas unggahan dengan `CLEARFRAME_MAX_
 
 ## Tentang klaim kualitas
 
-ClearFrame adalah prototipe, bukan produk yang sudah tervalidasi terhadap Wink. Belum ada benchmark terkontrol “2× lebih bagus” terhadap Wink; hasil sangat bergantung pada kualitas sumber, subjek, gerakan, dan perangkat. Bandingkan sebelum/sesudah pada beberapa foto dan video nyata sebelum menyimpulkan kualitasnya. Model dan proses berjalan lokal, tetapi backend Vulkan perangkat lunak tanpa GPU dapat sangat lambat.
+ClearFrame adalah prototipe, bukan produk yang sudah tervalidasi terhadap Wink. Editor web Wink tidak berhasil dirender di lingkungan pengujian ini (halaman terbuka tetapi antarmuka kosong), dan hasil Wink untuk sampel yang sama tidak tersedia, jadi tidak ada klaim “2× lebih bagus”. Perbandingan adil perlu memakai sumber dan setelan yang sama, lalu menilai hasil berdampingan pada beberapa foto dan video nyata. Jangan mengunggah media ke layanan luar tanpa izin. Model dan proses berjalan lokal, tetapi backend Vulkan perangkat lunak tanpa GPU dapat sangat lambat.
 
 ## Sumber dan lisensi
 

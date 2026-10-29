@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from PIL import Image, ImageDraw
+from PIL import Image, ImageChops, ImageDraw
 
 from app import RUNTIME_DIR, create_app
 from clearframe.core import _blend_and_save, _engine_command, enhance_image, enhance_video
@@ -85,10 +85,22 @@ class EnhancementSmokeTests(unittest.TestCase):
 
 
 class AppSmokeTests(unittest.TestCase):
+    def test_zero_strength_is_exact_lanczos_upscale(self):
+        with tempfile.TemporaryDirectory(prefix="clearframe-test-") as temp:
+            root = Path(temp)
+            source = Image.new("RGB", (7, 5), (100, 120, 140))
+            ai = Image.new("RGB", (14, 10), (240, 20, 30))
+            output = root / "zero-strength.png"
+            _blend_and_save(source, ai, output, scale=2, strength=0)
+            with Image.open(output) as result:
+                expected = source.resize((14, 10), Image.Resampling.LANCZOS)
+                self.assertIsNone(ImageChops.difference(expected, result).getbbox())
+
     def test_engine_tile_default_and_override(self):
-        args = (Path("engine"), Path("models"), Path("input"), Path("output"), 2)
+        args = (Path("engine"), Path("models"), Path("input"), Path("output"))
         command = _engine_command(*args)
-        self.assertEqual(command[command.index("-t") + 1], "512")
+        self.assertEqual(command[command.index("-s") + 1], "4")
+        self.assertEqual(command[command.index("-t") + 1], "0")
         with patch.dict(os.environ, {"CLEARFRAME_TILE_SIZE": "256"}):
             command = _engine_command(*args)
         self.assertEqual(command[command.index("-t") + 1], "256")
@@ -99,12 +111,31 @@ class AppSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Tingkatkan file", response.data)
         self.assertIn(b"foto dan video", response.data.lower())
-        self.assertIn(b'value="20"', response.data)
+        self.assertIn(b'value="30"', response.data)
+        self.assertIn(b'min="0"', response.data)
 
     def test_invalid_upload_is_rejected(self):
         client = create_app().test_client()
         response = client.post("/api/jobs", data={"file": (io.BytesIO(b"GIF89a"), "test.gif", "image/gif")})
         self.assertIn(response.status_code, (415, 503))
+
+    def test_zero_strength_image_job_is_accepted(self):
+        with tempfile.TemporaryDirectory(prefix="clearframe-test-") as temp:
+            data_root = Path(temp) / "data"
+            with patch("app.DATA_ROOT", data_root):
+                app = create_app()
+                store = app.extensions["clearframe_job_store"]
+                client = app.test_client()
+                image_bytes = io.BytesIO()
+                Image.new("RGB", (8, 8), (90, 110, 130)).save(image_bytes, format="PNG")
+                image_bytes.seek(0)
+                with patch.object(store.executor, "submit") as submit:
+                    response = client.post("/api/jobs", data={
+                        "scale": "2", "strength": "0",
+                        "file": (image_bytes, "sample.png", "image/png"),
+                    })
+                self.assertEqual(response.status_code, 202)
+                self.assertEqual(submit.call_args.args[8], 0)
 
 
 if __name__ == "__main__":

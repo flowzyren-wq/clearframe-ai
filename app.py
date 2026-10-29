@@ -153,11 +153,11 @@ def create_app() -> Flask:
             return jsonify({"error": "Format yang didukung: JPG, PNG, WebP, MP4, MOV, M4V, MKV, dan WebM."}), 415
         try:
             scale = int(request.form.get("scale", "2"))
-            strength = int(request.form.get("strength", "20"))
+            strength = int(request.form.get("strength", "30"))
         except ValueError:
             return jsonify({"error": "Nilai skala atau strength tidak valid."}), 400
-        if scale not in (2, 4) or not 10 <= strength <= 100:
-            return jsonify({"error": "Gunakan skala 2×/4× dan strength 10–100%."}), 400
+        if scale not in (2, 4) or not 0 <= strength <= 100:
+            return jsonify({"error": "Gunakan skala 2×/4× dan strength 0–100%."}), 400
         keep_audio = request.form.get("keep_audio", "true").lower() in {"true", "1", "on", "yes"}
         job_id = uuid.uuid4().hex
         job_dir = DATA_ROOT / job_id

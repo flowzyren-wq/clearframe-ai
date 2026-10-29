@@ -8,6 +8,7 @@ from fractions import Fraction
 from pathlib import Path
 from typing import Callable
 
+import numpy as np
 from PIL import Image, ImageOps
 
 
@@ -17,7 +18,14 @@ SUPPORTED_VIDEOS = {".mp4", ".mov", ".m4v", ".mkv", ".webm"}
 Progress = Callable[[str, int | None], None]
 VIDEO_BATCH_SIZE = 32
 VIDEO_FRAME_JPEG_QUALITY = 98
-DEFAULT_TILE_SIZE = 512
+# The x4plus model is trained for 4x. Its built-in 2x downscale path scrambled
+# quadrants in local testing, so the engine always runs at its native 4x and the
+# requested size is produced here with a high-quality resize.
+NATIVE_SCALE = 4
+DEFAULT_TILE_SIZE = 0
+DEFAULT_STRIP_HEIGHT = 256
+DEFAULT_STRIP_OVERLAP = 32
+DEFAULT_SINGLE_PASS_PIXELS = 1_200_000
 
 
 class EnhancementError(RuntimeError):
@@ -55,7 +63,7 @@ def _ffprobe(path: Path) -> dict:
 
 
 def _engine_command(engine: Path, model_dir: Path, input_path: Path, output_path: Path,
-                    scale: int, *, tile: int | None = None) -> list[str]:
+                    *, tile: int | None = None) -> list[str]:
     if tile is None:
         try:
             tile = int(os.environ.get("CLEARFRAME_TILE_SIZE", str(DEFAULT_TILE_SIZE)))
@@ -65,9 +73,90 @@ def _engine_command(engine: Path, model_dir: Path, input_path: Path, output_path
         raise EnhancementError("CLEARFRAME_TILE_SIZE harus 0 atau angka minimal 32.")
     return [
         str(engine), "-i", str(input_path), "-o", str(output_path),
-        "-n", GENERAL_MODEL, "-s", str(scale), "-t", str(tile),
+        "-n", GENERAL_MODEL, "-s", str(NATIVE_SCALE), "-t", str(tile),
         "-m", str(model_dir), "-f", "png",
     ]
+
+
+def _run_engine(engine: Path, model_dir: Path, source: Image.Image, output: Path,
+                work_dir: Path, tag: str) -> Image.Image:
+    """Run the model at its native 4x scale on one crop and return the result."""
+    input_path = work_dir / f"{tag}-in.png"
+    source.save(input_path, format="PNG")
+    try:
+        _run(_engine_command(engine, model_dir, input_path, output, tile=0))
+        with Image.open(output) as produced:
+            result = produced.convert("RGB")
+    finally:
+        input_path.unlink(missing_ok=True)
+        output.unlink(missing_ok=True)
+    expected = (source.width * NATIVE_SCALE, source.height * NATIVE_SCALE)
+    if result.size != expected:
+        raise EnhancementError(
+            f"Model mengembalikan ukuran {result.width}×{result.height}, "
+            f"padahal yang diharapkan {expected[0]}×{expected[1]}."
+        )
+    return result
+
+
+def _native_upscale(engine: Path, model_dir: Path, source: Image.Image,
+                    work_dir: Path, tag: str = "frame") -> Image.Image:
+    """Return a NATIVE_SCALE× image, using feathered overlapping strips for big inputs.
+
+    The engine's own tiling produced content-shifted seams in local testing, so it
+    always runs with internal tiling disabled; large inputs are split here instead.
+    """
+    try:
+        strip = int(os.environ.get("CLEARFRAME_STRIP_HEIGHT", str(DEFAULT_STRIP_HEIGHT)))
+        overlap = int(os.environ.get("CLEARFRAME_STRIP_OVERLAP", str(DEFAULT_STRIP_OVERLAP)))
+        single_pass_pixels = int(os.environ.get(
+            "CLEARFRAME_SINGLE_PASS_PIXELS", str(DEFAULT_SINGLE_PASS_PIXELS)))
+    except ValueError as exc:
+        raise EnhancementError("Nilai potongan pemrosesan harus berupa angka.") from exc
+    overlap = max(8, overlap - overlap % 2)
+    strip = max(32, strip - strip % 2)
+    width, height = source.size
+    if height <= strip or width * height <= single_pass_pixels:
+        return _run_engine(engine, model_dir, source, work_dir / f"{tag}-native.png", work_dir, tag)
+
+    target_h = height * NATIVE_SCALE
+    accumulator = np.zeros((target_h, width * NATIVE_SCALE, 3), dtype=np.float32)
+    weights = np.zeros((target_h, 1), dtype=np.float32)
+    y, index = 0, 0
+    while y < height:
+        core_end = min(height, y + strip)
+        top = max(0, y - overlap // 2)
+        bottom = min(height, core_end + overlap // 2)
+        upscaled = _run_engine(
+            engine, model_dir, source.crop((0, top, width, bottom)),
+            work_dir / f"{tag}-strip-{index:03d}.png", work_dir, f"{tag}-strip-{index:03d}",
+        )
+        pixels = np.asarray(upscaled, dtype=np.float32)
+        ramp_up = (y - top) * NATIVE_SCALE
+        ramp_down = (bottom - core_end) * NATIVE_SCALE
+        weight = np.ones((pixels.shape[0], 1), dtype=np.float32)
+        if top > 0 and ramp_up:
+            weight[:ramp_up, 0] = np.linspace(0.0, 1.0, ramp_up, endpoint=False)
+        if bottom < height and ramp_down:
+            weight[-ramp_down:, 0] = np.linspace(1.0, 0.0, ramp_down, endpoint=False)
+        dest = top * NATIVE_SCALE
+        accumulator[dest:dest + pixels.shape[0]] += pixels * weight
+        weights[dest:dest + pixels.shape[0]] += weight
+        y, index = core_end, index + 1
+    weights[weights == 0] = 1.0
+    merged = np.clip(accumulator / weights, 0, 255).round().astype(np.uint8)
+    return Image.fromarray(merged, mode="RGB")
+
+
+def _model_result(engine: Path, model_dir: Path, source: Image.Image, scale: int,
+                  work_dir: Path, tag: str = "frame") -> Image.Image:
+    """Full AI result at the requested scale (2x or 4x), preserving aspect exactly."""
+    native = _native_upscale(engine, model_dir, source, work_dir, tag)
+    target = (source.width * scale, source.height * scale)
+    if native.size == target:
+        return native
+    # Only downscale: 4x native to 2x, or a non-integer scale such as 3x.
+    return native.resize(target, Image.Resampling.LANCZOS)
 
 
 def _blend_and_save(source: Image.Image, ai_result: Image.Image, output: Path,
@@ -99,23 +188,18 @@ def _blend_and_save(source: Image.Image, ai_result: Image.Image, output: Path,
 
 def enhance_image(source_path: Path, output_path: Path, work_dir: Path,
                   engine: Path, model_dir: Path, scale: int = 2,
-                  strength: int = 20, progress: Progress | None = None) -> None:
+                  strength: int = 30, progress: Progress | None = None) -> None:
     if progress:
         progress("Menyiapkan foto", 5)
     work_dir.mkdir(parents=True, exist_ok=True)
-    input_png = work_dir / "input.png"
-    model_png = work_dir / "model-output.png"
     try:
         with Image.open(source_path) as opened:
             source = ImageOps.exif_transpose(opened).copy()
         alpha = source.getchannel("A") if source.mode in ("RGBA", "LA") else None
         rgb = source.convert("RGB")
-        rgb.save(input_png, format="PNG")
         if progress:
             progress("Meningkatkan detail foto", 20)
-        _run(_engine_command(engine, model_dir, input_png, model_png, scale))
-        with Image.open(model_png) as output:
-            result = output.copy()
+        result = _model_result(engine, model_dir, rgb, scale, work_dir, "photo")
         # Keep the original alpha channel separately; the neural model is used for RGB only.
         source_for_blend = rgb if alpha is None else Image.merge("RGBA", (*rgb.split(), alpha))
         _blend_and_save(source_for_blend, result, output_path, scale, strength, "PNG")
@@ -126,8 +210,8 @@ def enhance_image(source_path: Path, output_path: Path, work_dir: Path,
     except Exception as exc:
         raise EnhancementError(f"Gagal memproses foto: {exc}") from exc
     finally:
-        input_png.unlink(missing_ok=True)
-        model_png.unlink(missing_ok=True)
+        for leftover in work_dir.glob("photo*"):
+            leftover.unlink(missing_ok=True)
 
 
 def _fps_from_stream(stream: dict) -> Fraction:
@@ -218,7 +302,7 @@ def _encode_video(concat_list: Path, source_path: Path, output_path: Path,
 
 def enhance_video(source_path: Path, output_path: Path, work_dir: Path,
                   engine: Path, model_dir: Path, scale: int = 2,
-                  strength: int = 20, keep_audio: bool = True,
+                  strength: int = 30, keep_audio: bool = True,
                   progress: Progress | None = None,
                   max_seconds: int = 180,
                   batch_size: int = VIDEO_BATCH_SIZE) -> None:
@@ -253,45 +337,23 @@ def enhance_video(source_path: Path, output_path: Path, work_dir: Path,
             raise EnhancementError("FFmpeg tidak menemukan frame video.")
         durations = _frame_durations(source_path, len(source_frames), fps)
         if progress:
-            progress(f"Meningkatkan {len(source_frames)} frame ({scale}×) dalam batch", 15)
-        for start in range(0, len(source_frames), batch_size):
-            batch_input = work_dir / "batch-in"
-            batch_output = work_dir / "batch-ai"
-            batch_input.mkdir()
-            batch_output.mkdir()
-            originals = source_frames[start:start + batch_size]
-            try:
-                for original_path in originals:
-                    link_path = batch_input / original_path.name
-                    try:
-                        os.link(original_path, link_path)
-                    except OSError:
-                        shutil.copyfile(original_path, link_path)
-                _run(_engine_command(engine, model_dir, batch_input, batch_output, scale))
-                ai_frames = sorted(batch_output.glob("frame_*.png"))
-                if len(ai_frames) != len(originals):
-                    raise EnhancementError(
-                        "Jumlah frame berubah saat peningkatan batch "
-                        f"{start // batch_size + 1} ({len(originals)} → {len(ai_frames)})."
-                    )
-                for offset, (original_path, ai_path) in enumerate(zip(originals, ai_frames)):
-                    index = start + offset
-                    with Image.open(original_path) as original, Image.open(ai_path) as ai:
-                        original_copy, ai_copy = original.copy(), ai.copy()
-                    if original_copy.mode in ("RGBA", "LA"):
-                        alpha = original_copy.getchannel("A")
-                        blend_source = Image.merge("RGBA", (*original_copy.convert("RGB").split(), alpha))
-                    else:
-                        blend_source = original_copy.convert("RGB")
-                    _blend_and_save(
-                        blend_source, ai_copy,
-                        output_dir / f"frame_{index:08d}.jpg",
-                        scale, strength, "JPEG",
-                    )
-            finally:
-                shutil.rmtree(batch_input, ignore_errors=True)
-                shutil.rmtree(batch_output, ignore_errors=True)
-            completed = min(start + len(originals), len(source_frames))
+            progress(f"Meningkatkan {len(source_frames)} frame ({scale}×)", 15)
+        for index, original_path in enumerate(source_frames):
+            with Image.open(original_path) as original:
+                original_copy = original.copy()
+            if original_copy.mode in ("RGBA", "LA"):
+                alpha = original_copy.getchannel("A")
+                blend_source = Image.merge("RGBA", (*original_copy.convert("RGB").split(), alpha))
+            else:
+                blend_source = original_copy.convert("RGB")
+            ai_copy = _model_result(engine, model_dir, original_copy.convert("RGB"), scale,
+                                    work_dir, f"vid-{index:08d}")
+            _blend_and_save(
+                blend_source, ai_copy,
+                output_dir / f"frame_{index:08d}.jpg",
+                scale, strength, "JPEG",
+            )
+            completed = index + 1
             if progress:
                 progress(
                     f"Memproses frame {completed}/{len(source_frames)}",
