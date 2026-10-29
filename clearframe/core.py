@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 
 
 GENERAL_MODEL = "realesrgan-x4plus"
@@ -26,6 +26,8 @@ DEFAULT_TILE_SIZE = 0
 DEFAULT_STRIP_HEIGHT = 256
 DEFAULT_STRIP_OVERLAP = 32
 DEFAULT_SINGLE_PASS_PIXELS = 1_200_000
+DEFAULT_STRENGTH = 50
+BASELINE_SHARPEN = {"radius": 1.0, "percent": 40, "threshold": 2}
 
 
 class EnhancementError(RuntimeError):
@@ -166,13 +168,18 @@ def _blend_and_save(source: Image.Image, ai_result: Image.Image, output: Path,
     rgb = source.convert("RGB")
     target_size = (rgb.width * scale, rgb.height * scale)
     baseline = rgb.resize(target_size, Image.Resampling.LANCZOS)
+    effective_strength = max(0, min(100, strength))
+    if effective_strength:
+        # Mildly clarify interpolated edges before AI blending. This leaves the
+        # AI contribution unchanged and strength 0 remains exact Lanczos.
+        baseline = baseline.filter(ImageFilter.UnsharpMask(**BASELINE_SHARPEN))
     enhanced = ai_result.convert("RGB")
     if enhanced.size != target_size:
         raise EnhancementError(
             f"Model mengembalikan ukuran {enhanced.width}×{enhanced.height}, "
             f"padahal yang diharapkan {target_size[0]}×{target_size[1]}."
         )
-    result = Image.blend(baseline, enhanced, max(0, min(100, strength)) / 100.0)
+    result = Image.blend(baseline, enhanced, effective_strength / 100.0)
     if alpha is not None:
         enlarged_alpha = alpha.resize(target_size, Image.Resampling.LANCZOS)
         result.putalpha(enlarged_alpha)
@@ -188,7 +195,7 @@ def _blend_and_save(source: Image.Image, ai_result: Image.Image, output: Path,
 
 def enhance_image(source_path: Path, output_path: Path, work_dir: Path,
                   engine: Path, model_dir: Path, scale: int = 2,
-                  strength: int = 30, progress: Progress | None = None) -> None:
+                  strength: int = DEFAULT_STRENGTH, progress: Progress | None = None) -> None:
     if progress:
         progress("Menyiapkan foto", 5)
     work_dir.mkdir(parents=True, exist_ok=True)
@@ -302,7 +309,7 @@ def _encode_video(concat_list: Path, source_path: Path, output_path: Path,
 
 def enhance_video(source_path: Path, output_path: Path, work_dir: Path,
                   engine: Path, model_dir: Path, scale: int = 2,
-                  strength: int = 30, keep_audio: bool = True,
+                  strength: int = DEFAULT_STRENGTH, keep_audio: bool = True,
                   progress: Progress | None = None,
                   max_seconds: int = 180,
                   batch_size: int = VIDEO_BATCH_SIZE) -> None:

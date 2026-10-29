@@ -1,52 +1,52 @@
 # Laporan Uji Kualitas ClearFrame
 
-Ringkasan: pengujian ulang menemukan bug serius pada versi sebelumnya. Semua foto yang diproses lewat jalur 2× bawaan engine keluar sebagai mosaik kuadran yang salah posisi, sehingga hasilnya bukan sekadar kurang tajam, tetapi rusak. Setelah jalur itu diganti dengan skala asli 4× dan tile internal dimatikan, hasilnya benar dan detailnya meningkat terukur.
+## Ringkasnya
 
-## Apa yang diuji
+ClearFrame kini menambahkan penajaman tepi yang sangat ringan pada pembesaran LANCZOS sebelum dicampur dengan AI. Pengaturan AI 0% tetap menghasilkan LANCZOS biasa; detail yang dibangkitkan model tidak ikut dipertajam lagi. Default dinaikkan menjadi 50% agar hasil lebih tegas, dengan catatan bahwa 30% lebih konservatif dan nilai di atas 50% lebih berisiko membuat tekstur tampak buatan.
 
-Tiga foto sintetis dibuat khusus agar tidak memakai foto pribadi siapa pun:
+Di tiga sampel sintetis dengan gambar acuan, langkah penajaman dasar menaikkan SSIM dan detail mikro pada campuran AI 30% maupun 50%. Pada 50%, rata-rata PSNR turun sedikit (0,02 dB) dibanding campuran 50% tanpa penajaman itu, jadi ini trade-off kejernihan, bukan bukti detail baru yang benar. Pada foto yang sama dengan dua hasil Wink, metrik energi tepi ClearFrame 50% masih sedikit di bawah Wink UHD. Tidak ada dasar untuk mengklaim “2× lebih bagus dari Wink”.
 
-| Foto | Isi | Tantangan |
-| --- | --- | --- |
-| Potret | Wajah dewasa fiktif, cahaya jendela | Tekstur kulit, rambut, mata |
-| Jalan kota | Gang batu, tanaman, papan "CAFE" | Detail halus, teks, refleksi |
-| Still life | Cangkir keramik dan kain linen | Butiran glasir, serat kain |
+## Uji dengan gambar acuan
 
-Setiap foto dipakai sebagai *ground truth* 720×1080, lalu diperkecil ke 360×540 (setara foto yang sudah kehilangan detail) dan dinaikkan kembali 2× oleh ClearFrame. Hasilnya dibandingkan dengan ground truth memakai dua ukuran:
+Tiga gambar sintetis 720×1080 (potret, jalan kota, dan produk) diperkecil menjadi 360×540, lalu diproses kembali ke 720×1080. Karena gambar beresolusi penuh tersedia sebagai acuan, hasil dapat dibandingkan dengan PSNR, SSIM, dan detail mikro rata-rata Laplacian. Detail mikro mengukur kekuatan perubahan lokal—bisa meningkat karena tepi yang berguna, noise, atau artefak.
 
-- **SSIM** — seberapa mirip struktur dan bentuk dengan aslinya (1,0 = identik).
-- **Detail mikro** — rata-rata kekuatan Laplacian, penanda seberapa banyak tekstur halus yang benar-benar terlihat.
-
-## Hasil
-
-Rata-rata tiga foto, 720×1080:
+Rata-rata tiga sampel:
 
 | Varian | SSIM | PSNR (dB) | Detail mikro |
-| --- | --- | --- | --- |
-| Pembesaran biasa (LANCZOS) | 0,8967 | 30,03 | 8,93 |
-| ClearFrame 15% | 0,9007 | 30,13 | 10,06 |
-| **ClearFrame 30% (default)** | 0,8966 | 29,54 | 12,01 |
-| ClearFrame 50% | 0,8805 | 28,18 | 15,30 |
-| ClearFrame 100% | 0,8061 | 24,50 | 25,15 |
+| --- | ---: | ---: | ---: |
+| LANCZOS biasa | 0,8967 | 30,03 | 8,93 |
+| LANCZOS + penajaman dasar ringan | 0,9044 | 30,18 | 10,27 |
+| AI 15%, sebelum perubahan baru | 0,9007 | 30,13 | 10,06 |
+| AI 30%, tanpa penajaman dasar | 0,8966 | 29,54 | 12,01 |
+| AI 30% + penajaman dasar ringan | 0,9013 | 29,54 | 12,89 |
+| AI 50%, tanpa penajaman dasar | 0,8805 | 28,18 | 15,30 |
+| **AI 50% + penajaman dasar ringan (default baru)** | **0,8841** | **28,16** | **15,86** |
+| AI 100%, tanpa penajaman dasar | 0,8061 | 24,50 | 25,15 |
 
-Waktu proses di sandbox CPU-only (8 thread, RAM 23 GiB, Vulkan llvmpipe): sekitar 180 detik per foto 360×540 menjadi 720×1080.
+Penajaman dasar yang dipakai adalah unsharp mask radius 1, kekuatan 40%, ambang 2. Pada AI 30% dan 50%, SSIM naik pada masing-masing dari ketiga sampel. Detail mikro juga naik. Perubahan PSNR kecil dan tidak seragam—karena itu parameter ini dipakai secara konservatif, bukan dianggap pemulihan detail yang pasti benar. Nilai 0% tidak memakai filter ini dan tetap sama persis dengan pembesaran LANCZOS.
 
 ![Perbandingan 1:1](comparison.png)
 
-Pada gambar di atas, kolom kanan mempertahankan bentuk wajah, ekspresi, dan warna kulit, tetapi helai rambut, tekstur dinding, dan butiran keramik lebih tegas. Di atas 50% tekstur mulai terasa "digoreng" dan kulit kehilangan kelembutan alami, jadi 30% dipilih sebagai default dan 15% untuk yang ingin perubahan paling halus.
+## Perbandingan dengan Wink pada satu foto yang sama
 
-## Bug yang diperbaiki
+Foto asli dan dua hasil Wink yang dikirim pengguna dibandingkan lokal saja. Semua gambar disesuaikan ke kanvas 2428×2560 dengan LANCZOS. Energi tepi relatif terhadap pembesaran LANCZOS foto asli:
 
-1. **Kuadran tertukar pada jalur 2×.** Engine mengembalikan gambar dengan empat bagian yang tersusun salah. Terukur pada potret: SSIM hanya 0,227 dan PSNR 10,6 dB, jauh di bawah pembesaran biasa. Jalur 4× bawaan engine benar, jadi pipeline sekarang selalu berjalan 4× lalu memperkecil ke ukuran yang diminta.
-2. **Sambungan tile.** Dengan tile 512, muncul garis mendatar di mana isi gambar bergeser. Tile internal kini dimatikan; input besar dipotong menjadi strip mendatar yang saling tumpang tindih lalu dilebur dengan gradasi, sehingga tidak ada garis sambungan.
+| Hasil | Energi tepi relatif |
+| --- | ---: |
+| ClearFrame 50% lama, tanpa penajaman dasar baru | 1,375× |
+| ClearFrame 50% dengan penajaman dasar baru (perkiraan dari keluaran AI tersimpan) | 1,387× |
+| Wink UHD | 1,436× |
+| Wink UHD AI | 3,862× |
 
-Dampak praktisnya besar: sebelum perbaikan, seluruh foto dan setiap frame video melewati jalur yang rusak ini. Itulah sebabnya hasil sebelumnya tampak "berbayang" walau kekuatan dinaikkan-turunkan.
+Angka ClearFrame baru diperkirakan dengan menerapkan langkah penajaman dasar pada keluaran AI 50% yang sudah tersimpan; model tidak dijalankan ulang pada foto pribadi untuk pengukuran ini. Energi tepi bukan skor kualitas persepsi: detail palsu, noise, dan halo juga dapat menaikkannya. Sampel hanya satu potret dan tidak memiliki acuan resolusi tinggi, jadi tabel ini tidak membuktikan pemenang secara visual. Yang dapat dikatakan: perubahan baru membuat hasil sedikit lebih tegas, tetapi belum menyamai energi tepi Wink UHD pada ukuran kanvas ini; Wink UHD AI jauh lebih agresif.
 
-## Batas pengujian ini
+## Implementasi dan batas
 
-- Sampel sintetis, bukan foto kamera asli. Foto asli dengan noise sensor, motion blur, atau kompresi berat bisa berperilaku berbeda.
-- SSIM/PSNR menghukum detail baru yang plausibel, jadi skor sedikit lebih rendah belum berarti hasilnya lebih buruk secara visual. Karena itu penilaian akhir tetap memakai perbandingan berdampingan.
-- Belum ada perbandingan terkontrol dengan Wink. Editor web Wink tidak berhasil dirender di lingkungan pengujian (halaman terbuka, antarmuka kosong), dan tidak ada hasil Wink untuk sampel yang sama. Klaim "2× lebih bagus dari Wink" karena itu **tidak** dibuat.
-- Uji video baru mencakup integritas (jumlah frame, urutan, durasi, audio, ukuran), belum kualitas visual per frame pada klip nyata.
+- Model tetap `realesrgan-x4plus`, model umum untuk foto dan video. Tidak ada mode/model anime atau sintesis wajah khusus.
+- Model dijalankan pada 4× aslinya, lalu diperkecil bila pengguna memilih 2×. Jalur 2× bawaan engine pernah menyusun kuadran secara salah, sehingga tidak dipakai.
+- Gambar besar diproses dalam strip bertumpang-tindih. Tile internal engine dimatikan karena sebelumnya menimbulkan sambungan konten bergeser.
+- Pada mesin sandbox CPU-only yang tersedia (8 thread, RAM 23 GiB), satu inference resolusi penuh pernah memerlukan sekitar 15 menit. Kecepatan bergantung perangkat; Vulkan software dapat sangat lambat.
+- Video tetap diproses per frame, sehingga detail dapat berubah antar-frame saat gerakan cepat. Audio asli dipertahankan jika diminta. Penajaman dasar deterministik diterapkan per frame, tetapi uji ini belum mengukur kualitas video nyata.
+- Foto contoh diproses dan dibandingkan lokal, tidak diunggah ke layanan luar.
 
-Angka mentah ada di [benchmark-results.json](benchmark-results.json).
+Angka sintetis mentah ada di [benchmark-results.json](benchmark-results.json); benchmark yang dapat dijalankan ulang ada di [benchmark.py](benchmark.py). Klaim “2× lebih bagus” tidak dibuat karena satu foto dan metrik ini tidak cukup untuk menyimpulkan keunggulan persepsi secara adil.

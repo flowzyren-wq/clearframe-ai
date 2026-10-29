@@ -60,9 +60,9 @@
             </div>
           </fieldset>
           <fieldset class="setting-group strength-group">
-            <legend><label for="strength">Campuran detail AI <output id="strength-value">30%</output></label></legend>
-            <input id="strength" type="range" min="0" max="100" step="5" value="30">
-            <div class="range-labels"><span>0% · perbesar saja</span><span>Lebih banyak detail AI</span></div>
+            <legend><label for="strength">Campuran detail AI <output id="strength-value">{{ default_strength }}%</output></label></legend>
+            <input id="strength" type="range" min="0" max="100" step="5" value="{{ default_strength }}">
+            <div class="range-labels"><span>0% · Lanczos saja</span><span>Di atas 50% lebih berisiko tampak AI</span></div>
           </fieldset>
         </div>
 

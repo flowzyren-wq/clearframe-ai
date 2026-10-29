@@ -15,7 +15,7 @@ import time
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFilter
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -81,12 +81,18 @@ def main() -> int:
         ai = _model_result(ENGINE, MODELS, lr, 2, work, name)
         seconds = time.perf_counter() - started
         baseline = lr.resize(TARGET, Image.Resampling.LANCZOS)
+        clarified_baseline = baseline.filter(
+            ImageFilter.UnsharpMask(radius=1.0, percent=40, threshold=2)
+        )
         gt_l = luma(gt)
         rows = []
         for label, im in (("lanczos", baseline),
+                          ("lanczos_sharp_base_0.4", clarified_baseline),
                           ("ai_15", Image.blend(baseline, ai, 0.15)),
                           ("ai_30", Image.blend(baseline, ai, 0.30)),
+                          ("ai_30_sharp_base_0.4", Image.blend(clarified_baseline, ai, 0.30)),
                           ("ai_50", Image.blend(baseline, ai, 0.50)),
+                          ("ai_50_sharp_base_0.4", Image.blend(clarified_baseline, ai, 0.50)),
                           ("ai_100", ai)):
             im.save(OUT / f"{name}_{label}.png")
             rows.append({"variant": label, "ssim": round(ssim(luma(im), gt_l), 5),

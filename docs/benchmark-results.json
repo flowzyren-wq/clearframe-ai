@@ -10,6 +10,12 @@
         "detail": 6.194
       },
       {
+        "variant": "lanczos_sharp_base_0.4",
+        "psnr_db": 34.35036,
+        "ssim": 0.940499,
+        "detail": 6.90745
+      },
+      {
         "variant": "lanczos_sharp_0.4",
         "psnr_db": 34.32,
         "ssim": 0.94068,
@@ -28,10 +34,22 @@
         "detail": 9.811
       },
       {
+        "variant": "ai_30_sharp_base_0.4",
+        "psnr_db": 33.0782,
+        "ssim": 0.932718,
+        "detail": 10.2757
+      },
+      {
         "variant": "ai_50",
         "psnr_db": 31.01,
         "ssim": 0.90723,
         "detail": 13.414
+      },
+      {
+        "variant": "ai_50_sharp_base_0.4",
+        "psnr_db": 30.91457,
+        "ssim": 0.907751,
+        "detail": 13.69744
       },
       {
         "variant": "ai_70",
@@ -64,6 +82,12 @@
         "detail": 6.542
       },
       {
+        "variant": "lanczos_sharp_base_0.4",
+        "psnr_db": 31.35272,
+        "ssim": 0.941965,
+        "detail": 7.45794
+      },
+      {
         "variant": "lanczos_sharp_0.4",
         "psnr_db": 31.35,
         "ssim": 0.94222,
@@ -82,10 +106,22 @@
         "detail": 9.101
       },
       {
+        "variant": "ai_30_sharp_base_0.4",
+        "psnr_db": 30.5101,
+        "ssim": 0.936109,
+        "detail": 9.6797
+      },
+      {
         "variant": "ai_50",
         "psnr_db": 28.94,
         "ssim": 0.91724,
         "detail": 11.714
+      },
+      {
+        "variant": "ai_50_sharp_base_0.4",
+        "psnr_db": 28.89939,
+        "ssim": 0.919536,
+        "detail": 12.07748
       },
       {
         "variant": "ai_70",
@@ -118,6 +154,12 @@
         "detail": 14.04
       },
       {
+        "variant": "lanczos_sharp_base_0.4",
+        "psnr_db": 24.83283,
+        "ssim": 0.830638,
+        "detail": 16.45764
+      },
+      {
         "variant": "lanczos_sharp_0.4",
         "psnr_db": 24.83,
         "ssim": 0.83171,
@@ -136,10 +178,22 @@
         "detail": 17.125
       },
       {
+        "variant": "ai_30_sharp_base_0.4",
+        "psnr_db": 25.032,
+        "ssim": 0.835018,
+        "detail": 18.7227
+      },
+      {
         "variant": "ai_50",
         "psnr_db": 24.6,
         "ssim": 0.81699,
         "detail": 20.777
+      },
+      {
+        "variant": "ai_50_sharp_base_0.4",
+        "psnr_db": 24.67012,
+        "ssim": 0.824956,
+        "detail": 21.79653
       },
       {
         "variant": "ai_70",

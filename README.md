@@ -24,15 +24,15 @@ Buka `http://127.0.0.1:7860`. Server hanya bind ke localhost secara default. Unt
 
 - Backend memakai model general-purpose `realesrgan-x4plus` dari Real-ESRGAN. Installer mengunduh rilis portabel resmi tetapi **hanya mengekstrak model umum**; model anime tidak disimpan di proyek atau dipasang.
 - Model selalu dijalankan pada skala aslinya 4×, lalu hasilnya diperkecil ke 2× bila perlu. Jalur 2× bawaan engine ternyata menyusun kuadran gambar di posisi salah pada pengujian lokal, sehingga tidak dipakai lagi. Tile internal engine juga dimatikan karena meninggalkan sambungan konten bergeser; gambar besar dipotong menjadi strip mendatar yang tumpang tindih lalu dilebur.
-- Neural output dicampur dengan versi LANCZOS dari sumber. Default 30% dipilih dari pengujian tiga foto sintetis: pada titik ini detail mikro naik sekitar 34% dibanding pembesaran biasa sementara rata-rata kemiripan struktur setara (SSIM 0,8966 vs 0,8967). 15% cocok bila ingin perubahan paling halus (SSIM justru sedikit lebih tinggi dari pembesaran biasa). Pilihan 0% mematikan kontribusi AI. Di atas 50% tekstur mulai terasa over-processed, terutama pada kulit.
+- Neural output dicampur dengan versi LANCZOS dari sumber. Default AI 50% dipilih sebagai setelan lebih tegas untuk foto/video sehari-hari; penajaman dasar yang sangat ringan diterapkan pada versi LANCZOS sebelum blending jika AI tidak 0%. Dalam uji tiga gambar sintetis, ini menaikkan SSIM rata-rata campuran AI 50% dari 0,8805 ke 0,8841 dan detail mikro dari 15,30 ke 15,86; PSNR rata-rata turun sedikit dari 28,18 ke 28,16 dB. 30% lebih konservatif untuk tekstur kulit, dan di atas 50% tekstur lebih berisiko tampak buatan. Pilihan 0% tetap pembesaran LANCZOS persis tanpa filter maupun kontribusi AI.
 - Foto diekspor sebagai PNG. Video diproses per batch 32 frame untuk membatasi penyimpanan sementara; frame hasil antara memakai JPEG kualitas 98 sebelum encoding video. Urutan, timestamp, resolusi sesuai skala, dan audio asli dipertahankan jika diminta. Jika audio tidak dapat disalin ke MP4, backend mencoba encode AAC. Durasi prototipe default maksimum 180 detik.
 - Frame-by-frame super-resolution masih dapat menimbulkan perubahan detail antar-frame pada gerakan cepat. Tidak ada face synthesis; namun model AI tetap bisa mengarang tekstur, jadi periksa hasil dan turunkan strength bila perlu.
 
 ## Uji lokal
 
-Jalankan `python -m unittest discover -s tests -v` untuk memeriksa rendering aplikasi, retensi transparansi, mode 0% yang sama persis dengan pembesaran LANCZOS, ukuran hasil 2×, pemrosesan video lintas batch, durasi, dan audio.
+Jalankan `python -m unittest discover -s tests -v` untuk memeriksa rendering aplikasi, retensi transparansi, mode 0% yang sama persis dengan pembesaran LANCZOS, rumus penajaman dasar sebelum blending AI, ukuran hasil 2×, pemrosesan video lintas batch, durasi, dan audio.
 
-Benchmark lokal memakai tiga foto sintetis (potret, jalan kota, still life produk) sebagai ground truth 720×1080, diperkecil ke 360×540, lalu dinaikkan kembali. Di sandbox CPU-only (8 thread, RAM 23 GiB, Vulkan llvmpipe) satu foto 360×540 memerlukan sekitar 3 menit untuk hasil 720×1080. Skor kemiripan struktur (SSIM) pada potret: LANCZOS 0,937; campuran AI 15% 0,940; 30% 0,932; 50% 0,907. Detail mikro (rata-rata Laplacian) naik dari 6,19 pada LANCZOS menjadi 9,81 pada 30%. Angka ini mengukur kedekatan dengan gambar asli dan jumlah detail, bukan selera visual atau perbandingan dengan aplikasi lain.
+Benchmark memakai tiga foto sintetis sebagai ground truth 720×1080, diperkecil ke 360×540 lalu dinaikkan kembali. Satu inference resolusi penuh 960×1012 pada sandbox CPU-only (8 thread, RAM 23 GiB, Vulkan llvmpipe) memerlukan sekitar 15 menit. Angka kualitas yang dirangkum di laporan adalah SSIM/PSNR terhadap ground truth dan energi tepi; semuanya punya batas dan bukan skor selera visual. Perbandingan sampel Wink sekarang mencakup satu foto pengguna yang sama, tetapi hanya mengukur energi tepi setelah ukuran disamakan—bukan bukti pemenang persepsi. Tidak ada klaim “2× lebih bagus dari Wink”.
 
 ## Privasi dan masa simpan
 
@@ -42,7 +42,7 @@ Atur lokasi dengan `CLEARFRAME_DATA_DIR`, batas unggahan dengan `CLEARFRAME_MAX_
 
 ## Tentang klaim kualitas
 
-ClearFrame adalah prototipe, bukan produk yang sudah tervalidasi terhadap Wink. Editor web Wink tidak berhasil dirender di lingkungan pengujian ini (halaman terbuka tetapi antarmuka kosong), dan hasil Wink untuk sampel yang sama tidak tersedia, jadi tidak ada klaim “2× lebih bagus”. Perbandingan adil perlu memakai sumber dan setelan yang sama, lalu menilai hasil berdampingan pada beberapa foto dan video nyata. Jangan mengunggah media ke layanan luar tanpa izin. Model dan proses berjalan lokal, tetapi backend Vulkan perangkat lunak tanpa GPU dapat sangat lambat.
+ClearFrame adalah prototipe dan belum terbukti lebih baik daripada Wink. Satu foto dan dua hasil Wink yang diberikan pengguna sudah dibandingkan lokal pada kanvas yang sama: energi tepi ClearFrame 50% dengan penajaman dasar diperkirakan 1,387× pembesaran LANCZOS, dibanding Wink UHD 1,436× dan Wink UHD AI 3,862×. Energi tepi juga menghitung noise/artefak, sehingga tidak menunjukkan kualitas persepsi atau keaslian detail. Penilaian yang adil memerlukan beberapa foto dan video nyata serta peninjauan berdampingan. Jangan unggah media ke layanan luar tanpa izin. Model dan proses berjalan lokal, tetapi backend Vulkan perangkat lunak tanpa GPU dapat sangat lambat.
 
 ## Sumber dan lisensi
 

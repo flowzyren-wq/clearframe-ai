@@ -13,6 +13,7 @@ from flask import Flask, jsonify, render_template, request, send_file
 from werkzeug.utils import secure_filename
 
 from clearframe.core import (
+    DEFAULT_STRENGTH,
     EnhancementError,
     SUPPORTED_IMAGES,
     SUPPORTED_VIDEOS,
@@ -126,6 +127,7 @@ def create_app() -> Flask:
             "index.html", backend_ready=backend_ready,
             max_upload_mb=MAX_UPLOAD_BYTES // (1024 * 1024),
             max_video_seconds=MAX_VIDEO_SECONDS,
+            default_strength=DEFAULT_STRENGTH,
         )
 
     @app.get("/api/health")
@@ -153,7 +155,7 @@ def create_app() -> Flask:
             return jsonify({"error": "Format yang didukung: JPG, PNG, WebP, MP4, MOV, M4V, MKV, dan WebM."}), 415
         try:
             scale = int(request.form.get("scale", "2"))
-            strength = int(request.form.get("strength", "30"))
+            strength = int(request.form.get("strength", str(DEFAULT_STRENGTH)))
         except ValueError:
             return jsonify({"error": "Nilai skala atau strength tidak valid."}), 400
         if scale not in (2, 4) or not 0 <= strength <= 100:

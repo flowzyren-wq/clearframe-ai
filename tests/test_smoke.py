@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from PIL import Image, ImageChops, ImageDraw
+from PIL import Image, ImageChops, ImageDraw, ImageFilter
 
 from app import RUNTIME_DIR, create_app
 from clearframe.core import _blend_and_save, _engine_command, enhance_image, enhance_video
@@ -96,6 +96,22 @@ class AppSmokeTests(unittest.TestCase):
                 expected = source.resize((14, 10), Image.Resampling.LANCZOS)
                 self.assertIsNone(ImageChops.difference(expected, result).getbbox())
 
+    def test_positive_strength_sharpens_interpolation_base_before_ai_blend(self):
+        with tempfile.TemporaryDirectory(prefix="clearframe-test-") as temp:
+            root = Path(temp)
+            source = Image.new("RGB", (24, 20), (105, 125, 145))
+            draw = ImageDraw.Draw(source)
+            draw.rectangle((4, 3, 18, 16), outline=(20, 42, 55), width=2)
+            draw.line((0, 19, 23, 0), fill=(25, 118, 130), width=2)
+            ai = Image.new("RGB", (48, 40), (115, 135, 155))
+            output = root / "sharpened-base.png"
+            _blend_and_save(source, ai, output, scale=2, strength=30)
+            baseline = source.resize((48, 40), Image.Resampling.LANCZOS)
+            baseline = baseline.filter(ImageFilter.UnsharpMask(radius=1.0, percent=40, threshold=2))
+            expected = Image.blend(baseline, ai, 0.30)
+            with Image.open(output) as result:
+                self.assertIsNone(ImageChops.difference(expected, result).getbbox())
+
     def test_engine_tile_default_and_override(self):
         args = (Path("engine"), Path("models"), Path("input"), Path("output"))
         command = _engine_command(*args)
@@ -111,7 +127,7 @@ class AppSmokeTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b"Tingkatkan file", response.data)
         self.assertIn(b"foto dan video", response.data.lower())
-        self.assertIn(b'value="30"', response.data)
+        self.assertIn(b'value="50"', response.data)
         self.assertIn(b'min="0"', response.data)
 
     def test_invalid_upload_is_rejected(self):
