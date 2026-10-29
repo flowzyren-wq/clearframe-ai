@@ -13,3 +13,5 @@ outputs/
 *.png
 *.webp
 .env
+
+docs/benchmark-output/
